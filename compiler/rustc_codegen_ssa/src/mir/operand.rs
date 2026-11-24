@@ -1179,6 +1179,8 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                     let (_, element_ty) = constant_ty.simd_size_and_type(bx.tcx());
                     if let BackendRepr::SimdVector { .. } = layout.backend_repr
                         && element_ty.is_numeric()
+                        // MIR opts like GVN may have already evaluated the constant.
+                        && !matches!(constant.const_, mir::Const::Val(..))
                     {
                         let (llval, ty) = self.immediate_const_vector(bx, constant);
                         return OperandRef {
