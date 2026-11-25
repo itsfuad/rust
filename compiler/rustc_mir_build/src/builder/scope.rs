@@ -829,7 +829,6 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
         self.cfg.start_new_block().unit()
     }
 
-    /// Based on `FunctionCx::eval_unevaluated_mir_constant_to_valtree`.
     fn eval_unevaluated_mir_constant_to_valtree(
         &self,
         constant: ConstOperand<'tcx>,

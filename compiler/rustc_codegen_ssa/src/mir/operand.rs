@@ -265,6 +265,22 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
                 );
                 OperandRef { val: OperandValue::Pair(a_val, b_val), layout, move_annotation: None }
             }
+            // Most SIMD vector constants should be passed as immediates.
+            // (In particular, some intrinsics really rely on this.)
+            // `layout.ty` can also be a wrapper around a SIMD type, like `MaybeUninit`, and then the
+            // lanes can be partially initialized.
+            BackendRepr::SimdVector { element, count }
+                if layout.ty.is_simd() && layout.ty.simd_size_and_type(bx.tcx()).1.is_numeric() =>
+            {
+                let (_, element_ty) = layout.ty.simd_size_and_type(bx.tcx());
+                let element_llty = bx.immediate_backend_type(bx.layout_of(element_ty));
+                let size = element.size(bx);
+                let lanes: Vec<_> = (0..count.as_u64())
+                    .map(|i| read_scalar(offset + size * i, size, element, element_llty))
+                    .collect();
+                let val = OperandValue::Immediate(bx.const_vector(&lanes));
+                OperandRef { val, layout, move_annotation: None }
+            }
             _ if layout.is_zst() => OperandRef::zero_sized(layout),
             _ => {
                 // Neither a scalar nor scalar pair. Load from a place
@@ -1165,33 +1181,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 OperandRef { val, layout, move_annotation: None }
             }
 
-            mir::Operand::Constant(ref constant) => {
-                let constant_ty = self.monomorphize(constant.ty());
-                // Most SIMD vector constants should be passed as immediates.
-                // (In particular, some intrinsics really rely on this.)
-                if constant_ty.is_simd() {
-                    // However, some SIMD types do not actually use the vector ABI
-                    // (in particular, packed SIMD types do not). Ensure we exclude those.
-                    //
-                    // We also have to exclude vectors of pointers because `immediate_const_vector`
-                    // does not work for those.
-                    let layout = bx.layout_of(constant_ty);
-                    let (_, element_ty) = constant_ty.simd_size_and_type(bx.tcx());
-                    if let BackendRepr::SimdVector { .. } = layout.backend_repr
-                        && element_ty.is_numeric()
-                        // MIR opts like GVN may have already evaluated the constant.
-                        && !matches!(constant.const_, mir::Const::Val(..))
-                    {
-                        let (llval, ty) = self.immediate_const_vector(bx, constant);
-                        return OperandRef {
-                            val: OperandValue::Immediate(llval),
-                            layout: bx.layout_of(ty),
-                            move_annotation: None,
-                        };
-                    }
-                }
-                self.eval_mir_constant_to_operand(bx, constant)
-            }
+            mir::Operand::Constant(ref constant) => self.eval_mir_constant_to_operand(bx, constant),
         }
     }
 

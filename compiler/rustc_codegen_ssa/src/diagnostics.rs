@@ -712,13 +712,6 @@ pub(crate) struct MultipleMainFunctions {
 }
 
 #[derive(Diagnostic)]
-#[diag("could not evaluate shuffle_indices at compile time")]
-pub(crate) struct ShuffleIndicesEvaluation {
-    #[primary_span]
-    pub span: Span,
-}
-
-#[derive(Diagnostic)]
 pub enum InvalidMonomorphization<'tcx> {
     #[diag("invalid monomorphization of `{$name}` intrinsic: expected basic integer type, found `{$ty}`", code = E0511)]
     BasicIntegerType {

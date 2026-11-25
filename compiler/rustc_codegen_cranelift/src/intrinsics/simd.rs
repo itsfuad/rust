@@ -206,7 +206,7 @@ pub(super) fn codegen_simd_intrinsic_call<'tcx>(
             let total_len = lane_count * 2;
 
             // FIXME: this is a terrible abstraction-breaking hack.
-            // Find a way to reuse `immediate_const_vector` from `codegen_ssa` instead.
+            // Find a way to reuse `from_const_alloc` from `codegen_ssa` instead.
             let indexes = {
                 use rustc_middle::mir::interpret::*;
                 let idx_const = if let Some(const_) = idx.node.constant() {
